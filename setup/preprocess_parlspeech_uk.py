@@ -60,7 +60,7 @@ speeches = np.array(df['text'])
 
 # Create mapping between names and IDs
 speaker_party = np.array(
-    [speaker[i] + " (" + party[i] + ")" for i in range(len(speaker))])
+    [(speaker[i] + " (" + party[i] + ")").title() for i in range(len(speaker))])
 
 speaker_to_speaker_id = dict(
     [(y.title(), x) for x, y in enumerate(sorted(set(speaker_party)))])
