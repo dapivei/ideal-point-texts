@@ -21,12 +21,13 @@ import pandas as pd
 from scipy import sparse
 from sklearn.feature_extraction.text import CountVectorizer
 
-data_dir = os.path.join(project_dir, "data/parlspeech-2018-2019/raw")
-save_dir = os.path.join(project_dir, "data/parlspeech-2018-2019/clean")
+data_dir = os.path.join(project_dir, "data/parlspeech-full/raw")
+save_dir = os.path.join(project_dir, "data/parlspeech-full/clean")
+
 
 #%%
 
-df = pd.read_csv(os.path.join(data_dir, 'Corp_HouseOfCommons_V2_2018-2019.csv'), 
+df = pd.read_csv(os.path.join(data_dir, 'Corp_HouseOfCommons_V2.csv'), 
                  encoding="ISO-8859-1")
 
 #%%
@@ -40,8 +41,16 @@ df = df[~df['party'].isnull()]
 # removing speeches without recorded speaker
 df = df[~df['speaker'].isnull()]
 
-# ADDED: removing speeches about business of the house
-df = df[df['agenda']!='Business of the House']
+# ADDED: removing speeches from irrelevant agendas
+irrel_agendas = ['Business of the House', 
+                 'Summer Adjournment', 'May Adjournment', 'Easter Adjournment', 'Christmas Adjournment', 'Whitsun Adjournment',
+                 'Prorogation of Parliament', "Prime Minister's Update"]
+df = df[~df['agenda'].isin(irrel_agendas)]
+
+# ADDED: using only agendas discussed by multiple parties (at least 3)
+party_counts = df.groupby(['agenda'])['party'].nunique()
+large_agendas = party_counts[party_counts > 2].index.tolist()
+df = df[df['agenda'].isin(large_agendas)]
 
 # removing speeches with fewer than 50 words
 min_words = 50
