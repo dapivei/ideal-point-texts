@@ -26,7 +26,7 @@ def build_input_pipeline(data_dir):
   senator_indices = np.load(os.path.join(data_dir, "senator_indices.npy"))
   senator_map = np.loadtxt(os.path.join(data_dir, "senator_map.txt"),
                            dtype=str, 
-                           delimiter="\n")
+                           delimiter=",")
   num_bills = len(np.unique(bill_indices))
   num_senators = len(senator_map)
   dataset_size = len(votes)
