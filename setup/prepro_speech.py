@@ -2,6 +2,7 @@ import os
 import time
 import numpy as np
 import pandas as pd
+import setup_utils as utils
 
 from scipy import sparse
 from sklearn.feature_extraction.text import CountVectorizer
@@ -29,7 +30,8 @@ class ParliamentSpeechPreprocessor:
         min_speeches, 
         min_df, 
         max_df,
-        min_authors_per_word
+        min_authors_per_word,
+        topic_parts
         ):
         self.data_dir = data_dir
         self.save_dir = save_dir
@@ -40,6 +42,7 @@ class ParliamentSpeechPreprocessor:
         self.max = max_df
         self.stopwords = self._load_stopwords()
         self.min_authors_per_word = min_authors_per_word
+        self.topic_parts = topic_parts
 
 
     def _load_data(self):
@@ -73,11 +76,24 @@ class ParliamentSpeechPreprocessor:
         df = df[~df['chair']]
         df = df.dropna(subset=['party', 'speaker'])
         df = df[df['terms'] > self.min_words]
-        df = df[df['agenda']!='Business of the House']
+        irrel_agendas = [
+            'Business of the House', 
+            'Summer Adjournment', 
+            'May Adjournment', 
+            'Easter Adjournment', 
+            'Christmas Adjournment', 
+            'Whitsun Adjournment',
+            'Prorogation of Parliament', 
+            "Prime Minister's Update"
+            ]
+        df = df[~df['agenda'].isin(irrel_agendas)]
         num_speeches = df.groupby(['speaker', 'party']).size()
         speakers_to_drop = num_speeches[num_speeches < self.min_speeches].index
         df = df[~df.set_index(['speaker', 'party']).index.isin(speakers_to_drop)]
-        
+        #df = df.sample(10000)
+        party_counts = df.groupby(['agenda'])['party'].nunique()
+        large_agendas = party_counts[party_counts > self.topic_parts].index.tolist()
+        df = df[df['agenda'].isin(large_agendas)]
         filter_time = time.time() - start_time
         print(f"Data filtered. Time taken: {filter_time:.2f} seconds")
         
@@ -186,7 +202,7 @@ class ParliamentSpeechPreprocessor:
         """
         Adjust counts by removing unigram/n-gram pairs which co-occur and filter speeches with no words.
         """
-        print(" Adjust counts by removing unigram/n-gram pairs which co-occur")
+        print("Adjust counts by removing unigram/n-gram pairs which co-occur")
 
         counts_dense = utils.remove_cooccurring_ngrams(counts, vocabulary)
         
@@ -206,7 +222,7 @@ class ParliamentSpeechPreprocessor:
             os.makedirs(self.save_dir)
 
         # Name data
-        name = f"{self.min_words}wr_{self.min_speeches}sp"
+        name = f"{self.min_words}wr_{self.min_speeches}sp_{self.topic_parts}tp"
         save_counts = f"{self.save_dir}/counts_{name}.npz"
         save_author_indices = f"{self.save_dir}/author_indices_{name}.npy"
         save_vocabulary = f"{self.save_dir}/vocabulary_{name}.txt"
@@ -231,7 +247,8 @@ def preprocess_parliament_speeches(
     min_speeches,
     min_df,
     max_df,
-    min_authors_per_word
+    min_authors_per_word,
+    topic_parts
     ):
     preprocessor = ParliamentSpeechPreprocessor(
         data_dir, 
@@ -241,7 +258,8 @@ def preprocess_parliament_speeches(
         min_speeches,
         min_df,
         max_df,
-        min_authors_per_word
+        min_authors_per_word,
+        topic_parts
         )
     speaker, party, speeches = preprocessor.preprocess()
     speaker_to_speaker_id, author_indices, author_map = preprocessor.create_speaker_mapping(
@@ -249,10 +267,10 @@ def preprocess_parliament_speeches(
         )
     count_vect = preprocessor.initialize_count_vectorizer()
     counts, vocab = preprocessor.learn_initial_dtm(speeches, count_vect)
-    accept_words = preprocessor.filter_words_by_author_counts(counts.toarray(), author_indices, min_authors_per_word)
+    accept_words = preprocessor.filter_words_by_author_counts(counts.toarray(), author_indices)
     counts, vocab = preprocessor.fit_final_dtm(speeches, vocab, accept_words)
     counts_dense, author_indices = preprocessor.adjust_counts_and_filter_speeches(counts, vocab, author_indices)
-    preprocessor.save_preprocessed_data(speaker, party, speeches)
+    preprocessor.save_preprocessed_data(counts_dense, author_indices, vocab, author_map)
     
 
 # Run
@@ -261,9 +279,10 @@ save_dir = "/scratch/dp3766/text-base/ideal-point-texts/data/prepro"
 data_file = "Corp_HouseOfCommons_V2.csv"
 min_words = 50
 min_speeches = 24
-min_df=0.001
-max_df=0.3
-min_authors_per_word=10
+min_df = 0.001
+max_df = 0.3
+min_authors_per_word = 10
+topic_parts = 2
 start_time = time.time()
 preprocess_parliament_speeches(
     data_dir, 
@@ -273,7 +292,8 @@ preprocess_parliament_speeches(
     min_speeches, 
     min_df, 
     max_df, 
-    min_authors_per_word
+    min_authors_per_word,
+    topic_parts
     )
 total_time = time.time() - start_time
 print(f"Total time taken for preprocessing: {total_time:.2f} seconds")
