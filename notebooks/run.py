@@ -58,14 +58,14 @@ class TBIP:
         with plate("k", size = self.K, dim = -2):
             with plate("k_v", size = self.V, dim = -1):
                 # beta = sample("beta", dist.Gamma(0.3, 0.3))
-                beta = sample("beta", dist.Gamma(2, 1))
+                beta = sample("beta", dist.Gamma(beta_a, beta_b))
                 eta = sample("eta", dist.Normal())
 
         with plate("d", size = self.D, subsample_size=self.batch_size, dim = -2):
             with plate("d_k", size = self.K, dim = -1):
                 # Sample document-level latent variables (topic intensities)
                 # theta = sample("theta", dist.Gamma(0.3, 0.3))
-                theta = sample("theta", dist.Gamma(2, 1))
+                theta = sample("theta", dist.Gamma(theta_a, theta_b))
 
             # Compute Poisson rates for each word
             P = jnp.sum(jnp.expand_dims(theta, 2) * jnp.expand_dims(beta, 0) *
@@ -150,6 +150,12 @@ def main(args):
     print_steps = args.print_steps
     print_termi = args.print_termi
     words_per_topic = args.words_per_topic
+    global beta_a, beta_b, theta_a, theta_b
+    beta_a = args.beta_a
+    beta_b = args.beta_b
+    theta_a = args.theta_a
+    theta_b = args.theta_b
+
 
     if pre_initialize_parameters:
         nmf_model = NMF(
@@ -310,8 +316,8 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run TBIP model')
-    parser.add_argument('--orig', type=str, default='data/clean_full_2/', help='Path to the original data directory.')
-    parser.add_argument('--save', type=str, default='data/save/save_0/', help='Path where the outputs will be saved.')
+    parser.add_argument('--orig', type=str, default='../data/clean_full_3/', help='Path to the original data directory.')
+    parser.add_argument('--save', type=str, default='../data/save/save_0/', help='Path where the outputs will be saved.')
     parser.add_argument('--pre_initialize_parameters', type=bool, default=True, help='Whether to pre-initialize parameters using NMF.')
     parser.add_argument('--num_topics', type=int, default=50, help='Number of topics.')
     parser.add_argument('--rng_seed', type=int, default=0, help='Random seed for PRNG keys.')
@@ -324,6 +330,10 @@ if __name__ == "__main__":
     parser.add_argument('--print_steps', type=int, default=10000, help='Frequency of logging during SVI.')
     parser.add_argument('--print_termi', type=bool, default=True, help='Whether to print topics to terminal.')
     parser.add_argument('--words_per_topic', type=int, default=10, help='Number of words to display per topic.')
+    parser.add_argument('--beta_a', type=float, default=0.3, help='Gamma a for beta')
+    parser.add_argument('--beta_b', type=float, default=0.3, help='Gamma b for beta')
+    parser.add_argument('--theta_a', type=float, default=0.3, help='Gamma a for theta')
+    parser.add_argument('--theta_b', type=float, default=0.3, help='Gamma b for theta')
     args = parser.parse_args()
 
     main(args)
