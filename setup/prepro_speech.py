@@ -301,7 +301,7 @@ min_df = 0.001
 max_df = 0.3
 min_authors_per_word = 10
 topic_parts = 2
-start_date = '2018-01-01'
+start_date = '2016-01-01'
 end_date = '2023-12-30'
 
 start_time = time.time()
