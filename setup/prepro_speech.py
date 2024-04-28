@@ -214,8 +214,6 @@ class ParliamentSpeechPreprocessor:
         vocab = np.array(
             [k for (k, v) in sorted(c_v.vocabulary_.items(),key=lambda kv: kv[1])])
         words = c_v.get_feature_names_out()
-        print("Words:")
-        print(words[:100])
         logging.info(f"Final vocab size: {len(vocab)}")
         return counts, vocab
 
@@ -232,8 +230,6 @@ class ParliamentSpeechPreprocessor:
         existing_speeches = np.where(np.sum(counts_dense, axis=1) > 0)[0]
         logging.info(f"Final speeches with words: {len(existing_speeches)}")
         counts_dense = counts_dense[existing_speeches]
-        print("counts_dense:")
-        print(counts_dense[:100])   
         author_indices = author_indices[existing_speeches]
         return counts_dense, author_indices
 
@@ -243,7 +239,7 @@ class ParliamentSpeechPreprocessor:
         vocabulary_sorted_by_frequency = vocabulary[word_indices_sorted_by_frequency]
         word_frequencies_sorted = word_frequencies[word_indices_sorted_by_frequency]  
         wordcloud = WordCloud(
-            width=800, height=400, background_color='white'
+            width=800, height=400, background_color='white', margin=0
         ).generate_from_frequencies(
             dict(zip(vocabulary, word_frequencies))
         )
@@ -251,6 +247,10 @@ class ParliamentSpeechPreprocessor:
         plt.imshow(
             wordcloud, interpolation='bilinear'
         )
+        plt.margins(x=0, y=0)
+        plt.gca().xaxis.set_major_locator(plt.NullLocator())
+        plt.gca().yaxis.set_major_locator(plt.NullLocator())
+        plt.show()
         plt.axis('off')
         plt.title('Word Cloud')
         
@@ -332,7 +332,7 @@ min_speeches = 24
 min_df = 0.001
 max_df = 0.3
 min_authors_per_word = 10
-topic_parts = 2
+topic_parts = 0
 start_date = '2016-01-01'
 end_date = '2023-12-30'
 name = f"{min_words}wr_{min_speeches}sp_{topic_parts}tp_{start_date}st_{end_date}nd"
