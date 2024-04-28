@@ -4,11 +4,15 @@ import numpy as np
 import pandas as pd
 import setup_utils as utils
 import logging
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+import seaborn as sns
 
+from wordcloud import WordCloud
 from scipy import sparse
 from sklearn.feature_extraction.text import CountVectorizer
 from functools import wraps
-
+from collections import Counter
 
 def timing_decorator(func):
     @wraps(func)
@@ -146,7 +150,6 @@ class ParliamentSpeechPreprocessor:
 
         # Create author_indices array
         author_indices = np.array([speaker_to_speaker_id[s.title()] for s in speaker_party])
-        logging.info(f"Total author indices: {len(author_indices)}")
         # Create author_map array
         author_map = np.array(list(speaker_to_speaker_id.keys()))
 
@@ -210,6 +213,9 @@ class ParliamentSpeechPreprocessor:
         counts = c_v.fit_transform(speeches)
         vocab = np.array(
             [k for (k, v) in sorted(c_v.vocabulary_.items(),key=lambda kv: kv[1])])
+        words = c_v.get_feature_names_out()
+        print("Words:")
+        print(words[:100])
         logging.info(f"Final vocab size: {len(vocab)}")
         return counts, vocab
 
@@ -221,17 +227,37 @@ class ParliamentSpeechPreprocessor:
         """
         logging.info("Adjust counts by removing unigram/n-gram pairs which co-occur")
 
-        counts_dense = utils.remove_cooccurring_ngrams(counts, vocabulary)
-        
+        counts_dense = utils.remove_cooccurring_ngrams(counts, vocabulary)   
         # Remove speeches with no words
         existing_speeches = np.where(np.sum(counts_dense, axis=1) > 0)[0]
         logging.info(f"Final speeches with words: {len(existing_speeches)}")
         counts_dense = counts_dense[existing_speeches]
+        print("counts_dense:")
+        print(counts_dense[:100])   
         author_indices = author_indices[existing_speeches]
         return counts_dense, author_indices
 
+    def get_word_cloud(self, counts, vocabulary):
+        word_frequencies = np.asarray(counts.sum(axis=0)).reshape(-1)
+        word_indices_sorted_by_frequency = np.argsort(word_frequencies)[::-1]
+        vocabulary_sorted_by_frequency = vocabulary[word_indices_sorted_by_frequency]
+        word_frequencies_sorted = word_frequencies[word_indices_sorted_by_frequency]  
+        wordcloud = WordCloud(
+            width=800, height=400, background_color='white'
+        ).generate_from_frequencies(
+            dict(zip(vocabulary, word_frequencies))
+        )
+        plt.figure(figsize=(10, 6))
+        plt.imshow(
+            wordcloud, interpolation='bilinear'
+        )
+        plt.axis('off')
+        plt.title('Word Cloud')
+        
+        return plt
 
-    def save_preprocessed_data(self, counts_dense, author_indices, vocabulary, author_map):
+
+    def save_preprocessed_data(self, counts_dense, author_indices, vocabulary, author_map, plt):
 
         logging.info("Saving preprocessed data...")
         start_time = time.time()   
@@ -239,9 +265,11 @@ class ParliamentSpeechPreprocessor:
         save_author_indices = f"{self.save_dir}/{self.name}/author_indices.npy"
         save_vocabulary = f"{self.save_dir}/{self.name}/vocabulary.txt"
         save_author_map = f"{self.save_dir}/{self.name}/author_map.txt"
+        save_plot = f"{self.save_dir}/{self.name}/word_cloud.png"
 
         # Save preprocessed data
         logging.info("Saving preprocessed data files...")
+        plt.savefig(save_plot)
         sparse.save_npz(save_counts, sparse.csr_matrix(counts_dense).astype(np.float32))
         np.save(save_author_indices, author_indices)
         np.savetxt(save_vocabulary, vocabulary, fmt="%s")
@@ -290,7 +318,8 @@ def preprocess_parliament_speeches(
     accept_words = preprocessor.filter_words_by_author_counts(counts.toarray(), author_indices)
     counts, vocab = preprocessor.fit_final_dtm(speeches, vocab, accept_words)
     counts_dense, author_indices = preprocessor.adjust_counts_and_filter_speeches(counts, vocab, author_indices)
-    preprocessor.save_preprocessed_data(counts_dense, author_indices, vocab, author_map)
+    plt = preprocessor.get_word_cloud(counts_dense, vocab)
+    preprocessor.save_preprocessed_data(counts_dense, author_indices, vocab, author_map, plt)
     
 
 
