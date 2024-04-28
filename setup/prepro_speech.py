@@ -3,6 +3,7 @@ import time
 import numpy as np
 import pandas as pd
 import setup_utils as utils
+import logging
 
 from scipy import sparse
 from sklearn.feature_extraction.text import CountVectorizer
@@ -15,7 +16,8 @@ def timing_decorator(func):
         start_time = time.time()
         result = func(*args, **kwargs)
         end_time = time.time()
-        print(f"Execution time of {func.__name__}: {end_time - start_time:.2f} seconds")
+        execution_time = end_time - start_time
+        logging.info(f"Execution time of {func.__name__}: {execution_time:.2f} seconds")
         return result
     return wrapper
 
@@ -23,6 +25,7 @@ def timing_decorator(func):
 class ParliamentSpeechPreprocessor:
     def __init__(
         self, 
+        name,
         base_dir,
         data_dir, 
         save_dir, 
@@ -36,6 +39,7 @@ class ParliamentSpeechPreprocessor:
         start_date,
         end_date
         ):
+        self.name = name
         self.base_dir = base_dir
         self.data_dir = data_dir
         self.save_dir = save_dir
@@ -52,13 +56,13 @@ class ParliamentSpeechPreprocessor:
 
 
     def _load_data(self):
-        print("Loading data...")
+        logging.info("Loading data...")
         start_time = time.time()
         df = pd.read_csv(
             f"{self.data_dir}/{self.data_file}", encoding="ISO-8859-1" 
             )
         load_time = time.time() - start_time
-        print(f"Data loaded. Time taken: {load_time:.2f} seconds")
+        logging.info(f"Data loaded. Time taken: {load_time:.2f} seconds")
         return df
     
     
@@ -73,20 +77,20 @@ class ParliamentSpeechPreprocessor:
 
 
     def _filter_data(self, df):
-        #TODO: parametrized period required in the filter
-
-        print("Filtering data...")
+        logging.info("Filtering data...")
         start_time = time.time()
-        print("Initial number of rows:", len(df))
+        logging.info(f"Initial number of rows: {len(df)}")
         df['date'] = pd.to_datetime(df['date'])
-        df = df[(df['date'] > pd.to_datetime(self.start_date)) & (df['date'] < pd.to_datetime(self.end_date))]
-        print(f"Number of rows after filtering by dates {self.start_date}-{self.end_date}:", len(df))
+        start = pd.to_datetime(self.start_date)
+        end = pd.to_datetime(self.end_date)
+        df = df[(df['date'] >= start) & (df['date'] <= end)]
+        logging.info(f"Number of rows after filtering by dates {self.start_date}-{self.end_date}: {len(df)}")
         df = df[~df['chair']]
-        print(f"Number of rows after removing speeches corresponding to chair:", len(df))
+        logging.info(f"Number of rows after removing speeches corresponding to chair: {len(df)}")
         df = df.dropna(subset=['party', 'speaker'])
-        print(f"Number of rows after removing rows without party or speaker:", len(df))
+        logging.info(f"Number of rows after removing rows without party or speaker: {len(df)}")
         df = df[df['terms'] > self.min_words]
-        print(f"Number of rows after removing speeches not meeting minimum of words:", len(df))
+        logging.info(f"Number of rows after removing speeches not meeting minimum of words: {len(df)}")
         irrel_agendas = [
             'Business of the House', 
             'Summer Adjournment', 
@@ -98,7 +102,7 @@ class ParliamentSpeechPreprocessor:
             "Prime Minister's Update"
             ]
         df = df[~df['agenda'].isin(irrel_agendas)]
-        print(f"Number of rows after removing speeches with agenda of non-interest:", len(df))
+        logging.info(f"Number of rows after removing speeches with agenda of non-interest: {len(df)}")
         num_speeches = df.groupby(['speaker', 'party']).size()
         speakers_to_drop = num_speeches[num_speeches < self.min_speeches].index
         df = df[~df.set_index(['speaker', 'party']).index.isin(speakers_to_drop)]
@@ -106,22 +110,22 @@ class ParliamentSpeechPreprocessor:
         large_agendas = party_counts[party_counts > self.topic_parts].index.tolist()
         df = df[df['agenda'].isin(large_agendas)]
         filter_time = time.time() - start_time
-        print(f"Data filtered. Time taken: {filter_time:.2f} seconds")
+        logging.info(f"Data filtered. Time taken: {filter_time:.2f} seconds")
         
         return df
 
     def _preprocess_data(self, df):
-        print("Preprocessing data...")
+        logging.info("Preprocessing data...")
         start_time = time.time()
-        print("Initial number of rows:", len(df))
+        
+        logging.info(f"Initial number of rows: {len(df)}")
         
         df = self._filter_data(df)
         
-        print("Filtered number of rows:", len(df))
-        
+        logging.info(f"Filtered number of rows: {len(df)}")
         speaker, party, speeches = df['speaker'].values, df['party'].values, df['text'].values
         preprocess_time = time.time() - start_time
-        print(f"Data preprocessed. Time taken: {preprocess_time:.2f} seconds")
+        logging.info(f"Data preprocessed. Time taken: {preprocess_time:.2f} seconds")
         return speaker, party, speeches
     
     def preprocess(self):
@@ -133,16 +137,16 @@ class ParliamentSpeechPreprocessor:
     @timing_decorator
     def create_speaker_mapping(self, speaker, party):
         # Create speaker_party array
-        print("Create speaker_mapping ...")
+        logging.info("Create speaker_mapping ...")
         speaker_party = np.array([(s + " (" + p + ")").title() for s, p in zip(speaker, party)])
-
         # Create speaker to speaker_id mapping
         unique_speaker_party = sorted(set(speaker_party))
+        logging.info(f"Total speakers: {len(unique_speaker_party)}")
         speaker_to_speaker_id = {s.title(): idx for idx, s in enumerate(unique_speaker_party)}
 
         # Create author_indices array
         author_indices = np.array([speaker_to_speaker_id[s.title()] for s in speaker_party])
-
+        logging.info(f"Total author indices: {len(author_indices)}")
         # Create author_map array
         author_map = np.array(list(speaker_to_speaker_id.keys()))
 
@@ -154,7 +158,7 @@ class ParliamentSpeechPreprocessor:
         """
         Initialize CountVectorizer with specified parameters
         """
-        print("Initialize count vectorizer...")
+        logging.info("Initialize count vectorizer...")
 
         coun_vect = CountVectorizer(
             min_df=self.min,
@@ -171,7 +175,7 @@ class ParliamentSpeechPreprocessor:
         """
         Learn initial document-term matrix
         """
-        print("Learn initial document-term matrix...")
+        logging.info("Learn initial document-term matrix...")
         counts = coun_vect.fit_transform(speeches)
         vocabulary = np.array(
             [k for (k, v) in sorted(coun_vect.vocabulary_.items(), key=lambda kv: kv[1])]
@@ -184,10 +188,11 @@ class ParliamentSpeechPreprocessor:
         """
         Filter words based on the number of authors who used them
         """
-        print("Filter words based on the number of authors who used them...")
+        logging.info("Filter words based on the number of authors who used them...")
         counts_per_author = np.bincount(author_indices, minlength=counts.shape[1])
         author_counts_per_word = np.sum(counts > 0, axis=0)
         accept_words = np.where(author_counts_per_word >= self.min_authors_per_word)[0]
+        logging.info(f"Number of words accepted: {len(accept_words)}")
         return accept_words
 
 
@@ -196,7 +201,7 @@ class ParliamentSpeechPreprocessor:
         """
         Fit final document-term matrix with modified vocabulary.
         """
-        print("Fit final document-term matrix with modified vocabulary...")
+        logging.info("Fit final document-term matrix with modified vocabulary...")
 
         c_v = CountVectorizer(
             ngram_range=(1, 3),
@@ -205,6 +210,7 @@ class ParliamentSpeechPreprocessor:
         counts = c_v.fit_transform(speeches)
         vocab = np.array(
             [k for (k, v) in sorted(c_v.vocabulary_.items(),key=lambda kv: kv[1])])
+        logging.info(f"Final vocab size: {len(vocab)}")
         return counts, vocab
 
 
@@ -213,44 +219,40 @@ class ParliamentSpeechPreprocessor:
         """
         Adjust counts by removing unigram/n-gram pairs which co-occur and filter speeches with no words.
         """
-        print("Adjust counts by removing unigram/n-gram pairs which co-occur")
+        logging.info("Adjust counts by removing unigram/n-gram pairs which co-occur")
 
         counts_dense = utils.remove_cooccurring_ngrams(counts, vocabulary)
         
         # Remove speeches with no words
         existing_speeches = np.where(np.sum(counts_dense, axis=1) > 0)[0]
+        logging.info(f"Final speeches with words: {len(existing_speeches)}")
         counts_dense = counts_dense[existing_speeches]
         author_indices = author_indices[existing_speeches]
-
         return counts_dense, author_indices
 
 
     def save_preprocessed_data(self, counts_dense, author_indices, vocabulary, author_map):
 
-        print("Saving preprocessed data...")
-        start_time = time.time()
-
-        # Name data
-        name = f"{self.min_words}wr_{self.min_speeches}sp_{self.topic_parts}tp_{self.start_date}st_{self.end_date}nd"
-        if not os.path.exists(f"{self.save_dir}/{name}"):
-            os.makedirs(f"{self.save_dir}/{name}")       
-        save_counts = f"{self.save_dir}/{name}/counts.npz"
-        save_author_indices = f"{self.save_dir}/{name}/author_indices.npy"
-        save_vocabulary = f"{self.save_dir}/{name}/vocabulary.txt"
-        save_author_map = f"{self.save_dir}/{name}/author_map.txt"
+        logging.info("Saving preprocessed data...")
+        start_time = time.time()   
+        save_counts = f"{self.save_dir}/{self.name}/counts.npz"
+        save_author_indices = f"{self.save_dir}/{self.name}/author_indices.npy"
+        save_vocabulary = f"{self.save_dir}/{self.name}/vocabulary.txt"
+        save_author_map = f"{self.save_dir}/{self.name}/author_map.txt"
 
         # Save preprocessed data
-        print("Saving preprocessed data files...")
+        logging.info("Saving preprocessed data files...")
         sparse.save_npz(save_counts, sparse.csr_matrix(counts_dense).astype(np.float32))
         np.save(save_author_indices, author_indices)
         np.savetxt(save_vocabulary, vocabulary, fmt="%s")
         np.savetxt(save_author_map, author_map, fmt="%s")
         
         save_time = time.time() - start_time
-        print(f"Preprocessed data saved. Time taken: {save_time:.2f} seconds")
-        print("Preprocessing complete.")
+        logging.info(f"Preprocessed data saved. Time taken: {save_time:.2f} seconds")
+        logging.info("Preprocessing complete.")
 
 def preprocess_parliament_speeches(
+    name,
     base_dir,
     data_dir, 
     save_dir, 
@@ -265,6 +267,7 @@ def preprocess_parliament_speeches(
     end_date
     ):
     preprocessor = ParliamentSpeechPreprocessor(
+        name, 
         base_dir,
         data_dir, 
         save_dir, 
@@ -290,10 +293,10 @@ def preprocess_parliament_speeches(
     preprocessor.save_preprocessed_data(counts_dense, author_indices, vocab, author_map)
     
 
-# Run
-base_dir = "/scratch/dp3766/text-base/ideal-point-texts/"
-data_dir = "/scratch/dp3766/text-base/ideal-point-texts/data/raw"
-save_dir = "/scratch/dp3766/text-base/ideal-point-texts/data/prepro"
+
+base_dir = "/scratch/dp3766/text-base/ideal-point-texts"
+data_dir = f"{base_dir}/data/raw"
+save_dir = f"{base_dir}/data/prepro"
 data_file = "Corp_HouseOfCommons_V2.csv"
 min_words = 50
 min_speeches = 24
@@ -303,21 +306,31 @@ min_authors_per_word = 10
 topic_parts = 2
 start_date = '2016-01-01'
 end_date = '2023-12-30'
+name = f"{min_words}wr_{min_speeches}sp_{topic_parts}tp_{start_date}st_{end_date}nd"
+if not os.path.exists(f"{save_dir}/{name}"):
+    os.makedirs(f"{save_dir}/{name}")    
 
+logging.basicConfig(
+    filename=f'{save_dir}/{name}/preprocessing.log', 
+    level=logging.INFO,
+    format='%(asctime)s - %(message)s'
+    )
 start_time = time.time()
-preprocess_parliament_speeches(
-    base_dir,
+preprocessor = preprocess_parliament_speeches(
+    name,
+    base_dir, 
     data_dir, 
     save_dir, 
     data_file, 
-    min_words, 
+    min_words,
     min_speeches, 
     min_df, 
-    max_df, 
-    min_authors_per_word,
+    max_df,
+    min_authors_per_word, 
     topic_parts,
-    start_date,
+    start_date, 
     end_date
-    )
+)
 total_time = time.time() - start_time
-print(f"Total time taken for preprocessing: {total_time:.2f} seconds")
+logging.info(f"Total time taken for preprocessing: {total_time:.2f} seconds")
+logging.shutdown()
