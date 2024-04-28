@@ -1,0 +1,35 @@
+2024-04-28 12:35:08,372 - Loading data...
+2024-04-28 12:35:29,625 - Data loaded. Time taken: 21.25 seconds
+2024-04-28 12:35:29,626 - Preprocessing data...
+2024-04-28 12:35:29,626 - Initial number of rows: 1956223
+2024-04-28 12:35:29,626 - Filtering data...
+2024-04-28 12:35:29,626 - Initial number of rows: 1956223
+2024-04-28 12:35:29,797 - Number of rows after filtering by dates 2016-01-01-2023-12-30: 313089
+2024-04-28 12:35:29,827 - Number of rows after removing speeches corresponding to chair: 295150
+2024-04-28 12:35:29,884 - Number of rows after removing rows without party or speaker: 295030
+2024-04-28 12:35:29,911 - Number of rows after removing speeches not meeting minimum of words: 217928
+2024-04-28 12:35:29,940 - Number of rows after removing speeches with agenda of non-interest: 207482
+2024-04-28 12:35:30,078 - Data filtered. Time taken: 0.45 seconds
+2024-04-28 12:35:30,078 - Filtered number of rows: 206993
+2024-04-28 12:35:30,079 - Data preprocessed. Time taken: 0.45 seconds
+2024-04-28 12:35:30,264 - Create speaker_mapping ...
+2024-04-28 12:35:30,441 - Total speakers: 742
+2024-04-28 12:35:30,564 - Execution time of create_speaker_mapping: 0.30 seconds
+2024-04-28 12:35:30,564 - Initialize count vectorizer...
+2024-04-28 12:35:30,564 - Execution time of initialize_count_vectorizer: 0.00 seconds
+2024-04-28 12:35:30,565 - Learn initial document-term matrix...
+2024-04-28 12:36:50,314 - Execution time of learn_initial_dtm: 79.75 seconds
+2024-04-28 12:36:55,503 - Filter words based on the number of authors who used them...
+2024-04-28 12:36:59,393 - Number of words accepted: 10576
+2024-04-28 12:36:59,393 - Execution time of filter_words_by_author_counts: 3.89 seconds
+2024-04-28 12:37:00,197 - Fit final document-term matrix with modified vocabulary...
+2024-04-28 12:38:34,524 - Final vocab size: 10576
+2024-04-28 12:38:34,526 - Execution time of fit_final_dtm: 94.33 seconds
+2024-04-28 12:38:34,526 - Adjust counts by removing unigram/n-gram pairs which co-occur
+2024-04-28 12:38:56,980 - Final speeches with words: 206993
+2024-04-28 12:39:01,879 - Execution time of adjust_counts_and_filter_speeches: 27.35 seconds
+2024-04-28 12:39:03,974 - Saving preprocessed data...
+2024-04-28 12:39:03,974 - Saving preprocessed data files...
+2024-04-28 12:39:21,800 - Preprocessed data saved. Time taken: 17.83 seconds
+2024-04-28 12:39:21,802 - Preprocessing complete.
+2024-04-28 12:39:24,545 - Total time taken for preprocessing: 256.17 seconds
